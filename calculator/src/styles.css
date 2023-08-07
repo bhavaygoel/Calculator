@@ -8,9 +8,15 @@ body{
     background: linear-gradient(to right, #00AAFF, #00FF6C);
 }
 
+.parent {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
 .calculator-grid{
     display: grid;
-    margin-top: 2rem;
     grid-template-columns: repeat(4, 6rem);
     grid-template-rows: minmax(7rem, auto) repeat(5, 6rem);
 }
