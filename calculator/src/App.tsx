@@ -4,9 +4,10 @@ import DigitButton from "./DigitButton";
 import OperationButton from "./OperationButton";
 
 type CalculatorState = {
-  currentOperand: string;
-  previousOperand: string;
-  operation: string;
+  currentOperand: string | undefined;
+  previousOperand: string | undefined;
+  operation: string | undefined;
+  overwrite?: boolean;
 };
 
 export type CalculatorAction = {
@@ -25,12 +26,54 @@ export enum ACTIONS  {
   EVALUATE = 'evaluate'
 }
 
+function evaluate(state: CalculatorState): string{
+  const prev = parseFloat(state.previousOperand ?? "")
+  const current = parseFloat(state.currentOperand ?? "")
+  if (isNaN(prev) || isNaN(current)) return "";
+  let computation = 0;
+  switch (state.operation){
+    case "+":
+      computation = prev + current;
+      break;
+    case '-':
+      computation = prev - current;
+      break;
+    case '*':
+      computation = prev * current;
+      break;
+    case '/':
+      if(current === 0)
+        return "Division by zero";
+      computation = prev / current;
+      break;
+  }
+  return computation.toString();
+}
+
+const INTEGER_FORMATTER = new Intl.NumberFormat("en-IN", {
+  maximumFractionDigits: 0,
+})
+
+function formatOperand(operand: string){
+  if(operand === "") return
+  const [integer, decimal] = operand.split('.');
+  if (decimal == null) return INTEGER_FORMATTER.format(parseFloat(integer));
+  return `${INTEGER_FORMATTER.format(parseFloat(integer))}.${decimal}`
+}
+
 function reducer(state: CalculatorState, action: CalculatorAction): CalculatorState {
   switch (action.type) {
     // Handle different action types here and update the state accordingly
     case ACTIONS.ADD_DIGIT:
+      if(state.overwrite){
+        return{
+          ...state,
+          currentOperand: action.payload?.digit?.toString(),
+          overwrite: false
+        }
+      }
       if (action.payload?.digit === 0 && state.currentOperand === "0") return state;
-      if (action.payload?.digit === '.' && state.currentOperand.includes('.')) return state;
+      if (action.payload?.digit === '.' && state.currentOperand?.includes('.')) return state;
       return {
         ...state,
         currentOperand: `${state.currentOperand || ""}${action.payload?.digit}`
@@ -42,8 +85,56 @@ function reducer(state: CalculatorState, action: CalculatorAction): CalculatorSt
         previousOperand: "",
         operation: ""
       }
-    // case ACTIONS.CHOOSE_OPERATION:
-
+    case ACTIONS.CHOOSE_OPERATION:
+      if (state.currentOperand === "" && state.previousOperand === "") return state;
+      if (state.currentOperand === ""){
+        return {
+          ...state,
+          operation: action.payload?.operand
+        }
+      }
+      if (state.previousOperand === ""){
+        return{
+          ...state,
+          operation: action.payload?.operand,
+          previousOperand: state.currentOperand,
+          currentOperand: ""
+        }
+      }
+      return {
+        ...state,
+        previousOperand: evaluate(state),
+        operation: action.payload?.operand,
+        currentOperand: ""
+      }
+    case ACTIONS.EVALUATE:
+      if(state.operation === "" || state.currentOperand === "" || state.previousOperand === "") return state;
+      return {
+        ...state,
+        previousOperand: "",
+        operation: "",
+        currentOperand: evaluate(state),
+        overwrite: true
+      }
+    case ACTIONS.DELETE_DIGIT:
+      if (state.overwrite){
+        return{
+          ...state,
+          overwrite: false,
+          currentOperand: ""
+        }
+      }
+      if (state.currentOperand === undefined) return state;
+      if (state.currentOperand?.length === 1){
+        return{
+          ...state,
+          currentOperand: ""
+        }
+      }
+      return {
+        ...state,
+        currentOperand: state.currentOperand.slice(0, -1)
+      }
     default:
       return state;
   }
@@ -64,12 +155,12 @@ function App() {
     <div className="calculator-grid">
       <div className="output">
         <div className="previous-operand">
-          {previousOperand} {operation}
+          {formatOperand(previousOperand)} {operation}
         </div>
-        <div className="current-operand">{currentOperand}</div>
+        <div className="current-operand">{formatOperand(currentOperand)}</div>
       </div>
       <button onClick={() => dispatch({ type:ACTIONS.CLEAR})} className="span-two">AC</button>
-      <button>DEL</button>
+      <button onClick={() => dispatch( {type: ACTIONS.DELETE_DIGIT})}>DEL</button>
       <OperationButton operand="/" dispatch={dispatch} />
       <DigitButton digit={1} dispatch={dispatch} />
       <DigitButton digit={2} dispatch={dispatch} />
@@ -80,12 +171,12 @@ function App() {
       <DigitButton digit={6} dispatch={dispatch} />
       <OperationButton operand="+" dispatch={dispatch} />
       <DigitButton digit={7} dispatch={dispatch} />
-      <DigitButton digit={8} dispatch={dispatch} />
+      <DigitButton digit={8} dispatch={dispatch} /> 
       <DigitButton digit={9} dispatch={dispatch} />
       <OperationButton operand="-" dispatch={dispatch} />
       <DigitButton digit="." dispatch={dispatch} />
       <DigitButton digit={0} dispatch={dispatch} />
-      <button className="span-two">=</button>
+      <button onClick={ () => dispatch({ type: ACTIONS.EVALUATE})} className="span-two">=</button>
     </div>
     </div>
   );
